@@ -1,0 +1,117 @@
+#include <iostream>
+#include <string>
+#include <string.h>
+#include <fstream>
+#include <unistd.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <getopt.h>
+#include <dirent.h>
+#include <pwd.h>
+#include <grp.h>
+#include <vector>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/conf.h>
+#include <openssl/aes.h>
+#include <openssl/rand.h>
+using namespace std;
+
+static void hex_print(const void* pv, size_t len)
+{
+    const unsigned char * p = (const unsigned char*)pv;
+    if (NULL == pv)
+        printf("NULL");
+    else
+    {
+        size_t i = 0;
+        for (; i<len;++i){
+		printf("character is %c \t", *p);
+           	 printf("hexdecimal is%02X ", *p++);
+		printf("it has been called \n");    
+	}	
+
+	}
+    printf("\n");
+} 
+
+
+
+
+int main(int argc, const char * argv[])
+{
+	ERR_load_crypto_strings();
+
+  /* Load all digest and cipher algorithms */
+ 	 OpenSSL_add_all_algorithms();
+
+  /* Load config file, and other important initialisation */
+ 	 OPENSSL_config(NULL);
+
+	int keylength = 128;
+	unsigned char aes_key[keylength/8];
+    	memset(aes_key, 0, keylength/8);
+    	if (!RAND_bytes(aes_key, keylength/8))
+        	exit(-1);
+	size_t inputslength = 0;
+
+
+	string replace("Iamyihongdai");
+	inputslength = replace.length();
+	unsigned char aes_input[inputslength];
+	memcpy((void *)aes_input,(void *)replace.c_str(),inputslength);
+	printf("the first hex_print \t ");
+	printf("the size of aes_input is %d \t", sizeof(aes_input));
+ 	hex_print(aes_input, sizeof(aes_input));
+	
+
+
+   	 /* init vector */
+   	 unsigned char iv_enc[AES_BLOCK_SIZE], iv_dec[AES_BLOCK_SIZE];
+   	 RAND_bytes(iv_enc, AES_BLOCK_SIZE);
+   	 memcpy(iv_dec, iv_enc, AES_BLOCK_SIZE);
+		
+	const size_t encslength = ((inputslength + AES_BLOCK_SIZE) /AES_BLOCK_SIZE) * AES_BLOCK_SIZE;
+    	unsigned char enc_out[encslength];
+    	unsigned char dec_out[inputslength];
+    	memset(enc_out, 0, sizeof(enc_out));
+    	memset(dec_out, 0, sizeof(dec_out));
+
+    	// so i can do with this aes-cbc-128 aes-cbc-192 aes-cbc-256
+    	AES_KEY enc_key, dec_key;
+    	AES_set_encrypt_key(aes_key, keylength, &enc_key);
+    	
+
+
+
+	AES_cbc_encrypt(aes_input, enc_out, inputslength, &enc_key, iv_enc,AES_ENCRYPT);
+
+ 
+
+
+   	AES_set_decrypt_key(aes_key, keylength, &dec_key);
+    	AES_cbc_encrypt(enc_out, dec_out, encslength, &dec_key, iv_dec, AES_DECRYPT);
+	printf("original:\t");
+	for(int k = 0; k <  inputslength; k++){
+		printf(" %c ", aes_input[k]);
+	}
+
+   hex_print(aes_input, sizeof(aes_input));
+
+    printf("encrypt:\t");
+    hex_print(enc_out, sizeof(enc_out));
+
+    printf("decrypt:\t");
+    hex_print(dec_out, sizeof(dec_out));
+
+ EVP_cleanup();
+
+  /* if you omit the next, a small leak may be left when you make use of the BIO (low level API) for e.g. base64 transformations */
+  CRYPTO_cleanup_all_ex_data();
+
+  /* Remove error strings */
+  ERR_free_strings();
+
+    return 0;
+}
